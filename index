@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2a0f24">
+<title>Catch My Heart</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💌</text></svg>">
+<style>
+  :root{
+    --bg:#2a0f24; --bg2:#4a1838; --ink:#fff3ec; --rose:#ff5d8f; --gold:#ffd27a; --soft:#ffb3c9;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:Georgia,"Palatino Linotype",Palatino,serif;touch-action:none;overscroll-behavior:none}
+  body{background:radial-gradient(120% 90% at 50% 0%,var(--bg2),var(--bg) 70%)}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+  .hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;
+    padding:calc(env(safe-area-inset-top,0px) + 12px) 18px 0;font-size:1.1rem;pointer-events:none;z-index:2}
+  .bar{flex:1;height:8px;margin:0 14px;border-radius:8px;background:rgba(255,255,255,.15);overflow:hidden}
+  .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--rose),var(--gold));transition:width .25s}
+  .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:24px;z-index:3;background:rgba(42,15,36,.88);backdrop-filter:blur(6px)}
+  .screen.hide{display:none}
+  h1{font-size:clamp(2rem,8vw,3.4rem);margin:0 0 .3em;font-weight:400;font-style:italic;color:var(--soft)}
+  p{max-width:30ch;line-height:1.55;margin:.4em 0 1.2em;font-size:1.1rem}
+  button{font:inherit;font-size:1.15rem;padding:.8em 2em;border:0;border-radius:999px;cursor:pointer;
+    background:var(--rose);color:#2a0f24;font-weight:700;box-shadow:0 6px 24px rgba(255,93,143,.45)}
+  button:active{transform:scale(.96)}
+  button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+  .letter{background:#fff3ec;color:#3b1530;border-radius:6px;padding:26px 24px;max-width:min(92vw,420px);
+    max-height:72vh;overflow:auto;text-align:left;box-shadow:0 20px 60px rgba(0,0,0,.5);
+    transform:rotate(-1deg);animation:rise .8s ease-out}
+  .letter p{max-width:none;font-size:1.08rem;margin:0 0 .8em;color:#3b1530}
+  .letter .sig{text-align:right;font-style:italic;margin:0}
+  @keyframes rise{from{transform:translateY(40px) rotate(-1deg);opacity:0}to{transform:rotate(-1deg);opacity:1}}
+  @media (prefers-reduced-motion:reduce){.letter{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud"><span id="score">♥ 0</span><div class="bar"><i id="fill"></i></div><span id="lives">❤❤❤</span></div>
+
+<div class="screen" id="start">
+  <h1 id="title">For you</h1>
+  <p>Переміщуй кошик, щоб зловити кожне серце. Оминай розбиті. Збери достатньо — і відкриєш літеру.</p>
+  <button id="play">Play</button>
+</div>
+
+<div class="screen hide" id="over">
+  <h1>So close</h1>
+  <p>Навіть розбиті серця не можуть завадити мені кохати тебе. Спробуємо ще раз?</p>
+  <button id="again">Try again</button>
+</div>
+
+<div class="screen hide" id="win">
+  <div class="letter">
+    <p id="greet"></p>
+    <div id="msg"></div>
+    <p class="sig" id="sig"></p>
+  </div>
+  <p style="margin-top:1.2em"><button id="replay">Play again</button></p>
+</div>
+
+<script>
+/* ====== EDIT THESE ====== */
+const HIS_NAME   = "My Love, Slava";           // his name or nickname
+const YOUR_NAME  = "Third";                // your name
+const GOAL       = 15;                  // hearts needed to unlock the letter
+const LETTER     = [                    // each string is one paragraph
+  "Хто б міг подумати, що я зустріну такого хлопця, як ти, на Dirtyroulette? ХАХА. Ми знайомі лише 15 днів, але ти вже встиг стати людиною, з якою мені дуже подобається спілкуватися.",
+  "Мені подобається, як ти змушуєш мене усміхатися, навіть коли ми просто переписуємося про якісь дурниці. Дякую, що слухаєш мої історії, терпиш мої випадкові думки й дозволяєш мені розповідати тобі про свої проблеми. З тобою мені справді добре.",
+  "Я знаю, що ми спілкуємося зовсім недовго, але мені вже дуже хочеться побачити тебе наживо. Нарешті обійняти, поцілувати й провести час разом без цього клятого екрана між нами.",
+  "А ще я дуже чекаю, коли ми зможемо здійснити всі ті речі, про які говорили, мріяли й фантазували. І так, я маю на увазі ВСІ ті речі. 😏 Ти чудово знаєш, про що я, хахаха.",
+  "Хочу, щоб ми разом гуляли, сміялися, цілувалися, обіймалися, дуріли й робили все, що нам захочеться. А деякі наші плани, мабуть, краще залишити між нами. 🤭❤️",
+  "Не знаю, що чекає на нас попереду, але мені подобається те, що відбувається між нами зараз. Я хочу й далі пізнавати тебе, фліртувати з тобою й створювати нові спогади разом.",
+  "Цілую тебе, мій Славо. ❤️"
+];
+/* ======================== */
+
+const $ = id => document.getElementById(id);
+const cv = $('c'), ctx = cv.getContext('2d');
+let W, H, dpr;
+function resize(){
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W*dpr; cv.height = H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  basket.y = H - Math.max(70, H*0.1);
+  basket.x = Math.min(Math.max(basket.x, basket.w/2), W - basket.w/2);
+}
+const basket = {x:0, w:96, h:46, y:0};
+let items = [], bits = [], score = 0, lives = 3, running = false, last = 0, spawnT = 0, targetX = null;
+
+$('title').textContent = "For " + HIS_NAME;
+$('greet').textContent = "Dear " + HIS_NAME + ",";
+$('msg').innerHTML = LETTER.map(t => "<p></p>").join("");
+[...$('msg').children].forEach((el,i)=> el.textContent = LETTER[i]);
+$('sig').textContent = "Forever yours, " + YOUR_NAME + " ♥";
+
+function show(id){ ['start','over','win'].forEach(s => $(s).classList.toggle('hide', s !== id)); }
+
+function reset(){
+  items = []; bits = []; score = 0; lives = 3; spawnT = 0;
+  basket.x = W/2; targetX = null;
+  hud();
+}
+function hud(){
+  $('score').textContent = "♥ " + score;
+  $('fill').style.width = Math.min(100, score/GOAL*100) + "%";
+  $('lives').textContent = "❤".repeat(Math.max(lives,0)) + "🖤".repeat(3 - Math.max(lives,0));
+}
+function start(){
+  reset(); show(null); running = true; last = performance.now();
+  requestAnimationFrame(loop);
+}
+function end(win){
+  running = false; show(win ? 'win' : 'over');
+}
+
+function spawn(){
+  const bad = Math.random() < 0.22;
+  const size = 26 + Math.random()*14;
+  items.push({
+    x: size + Math.random()*(W - size*2), y: -size,
+    s: size, bad,
+    v: (110 + Math.random()*90 + score*5) ,
+    sw: Math.random()*6.28, ch: bad ? "💔" : (Math.random()<.2 ? "💖" : "❤️")
+  });
+}
+function burst(x,y,good){
+  for(let i=0;i<10;i++){
+    const a = Math.random()*6.28, sp = 60 + Math.random()*140;
+    bits.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-60,life:.7,c:good?"#ffb3c9":"#888"});
+  }
+}
+
+function loop(t){
+  if(!running) return;
+  const dt = Math.min((t-last)/1000, .05); last = t;
+
+  if(targetX !== null) basket.x += (targetX - basket.x) * Math.min(1, dt*18);
+  basket.x = Math.min(Math.max(basket.x, basket.w/2), W - basket.w/2);
+
+  spawnT -= dt;
+  if(spawnT <= 0){ spawn(); spawnT = Math.max(.35, .9 - score*.03); }
+
+  for(const it of items){
+    it.y += it.v*dt; it.sw += dt*2; it.x += Math.sin(it.sw)*14*dt;
+    const hit = it.y + it.s*.4 > basket.y && it.y < basket.y + basket.h &&
+                Math.abs(it.x - basket.x) < basket.w/2 + it.s*.3;
+    if(hit){
+      it.dead = true; burst(it.x, it.y, !it.bad);
+      if(it.bad){ lives--; if(navigator.vibrate) navigator.vibrate(60); }
+      else score += (it.ch === "💖" ? 2 : 1);
+      hud();
+      if(score >= GOAL) return end(true);
+      if(lives <= 0) return end(false);
+    } else if(it.y > H + it.s){
+      it.dead = true;
+    }
+  }
+  items = items.filter(i => !i.dead);
+  for(const b of bits){ b.x += b.vx*dt; b.y += b.vy*dt; b.vy += 300*dt; b.life -= dt; }
+  bits = bits.filter(b => b.life > 0);
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for(const it of items){
+    ctx.font = it.s + "px serif";
+    ctx.fillText(it.ch, it.x, it.y);
+  }
+  for(const b of bits){
+    ctx.globalAlpha = Math.max(0,b.life/.7); ctx.fillStyle = b.c;
+    ctx.fillRect(b.x, b.y, 4, 4);
+  }
+  ctx.globalAlpha = 1;
+  // basket
+  const x = basket.x - basket.w/2, y = basket.y;
+  ctx.fillStyle = "#ffd27a";
+  ctx.beginPath();
+  ctx.moveTo(x, y); ctx.lineTo(x+basket.w, y);
+  ctx.lineTo(x+basket.w-12, y+basket.h); ctx.lineTo(x+12, y+basket.h);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#e8a94a";
+  ctx.fillRect(x, y, basket.w, 8);
+}
+
+/* input: touch, mouse, keyboard */
+function pointer(e){
+  const p = e.touches ? e.touches[0] : e;
+  targetX = p.clientX;
+}
+addEventListener('touchstart', e => { if(running){ pointer(e); } }, {passive:true});
+addEventListener('touchmove',  e => { if(running){ pointer(e); e.preventDefault(); } }, {passive:false});
+addEventListener('mousemove',  e => { if(running) pointer(e); });
+const keys = {};
+addEventListener('keydown', e => {
+  if(e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ keys[e.key] = true; e.preventDefault(); }
+});
+addEventListener('keyup', e => { delete keys[e.key]; });
+setInterval(() => {
+  if(!running) return;
+  if(keys.ArrowLeft)  targetX = (targetX ?? basket.x) - 22;
+  if(keys.ArrowRight) targetX = (targetX ?? basket.x) + 22;
+}, 16);
+
+$('play').onclick = start;
+$('again').onclick = start;
+$('replay').onclick = start;
+addEventListener('resize', resize);
+resize();
+</script>
+</body>
+</html>
